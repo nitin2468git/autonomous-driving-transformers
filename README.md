@@ -1,187 +1,191 @@
-# Homework 4
+# Autonomous Driving with Transformers and CNNs
 
-In this homework, we will learn to drive with Transformers and convolutional networks!
+This repository contains implementations of three different neural network architectures for autonomous driving trajectory prediction using the SuperTuxKart Drive Dataset.
 
-Colab Starter: [link](https://colab.research.google.com/drive/1wRuzQ15Q9-ef2L7Yju-KbAUHo3w1O10i?usp=sharing)
+## 🚗 Project Overview
 
-**NOTE:** Even if you're not using Colab, we recommend taking a look at the Colab notebook to see the recommended workflow and sample usage.
+The goal is to predict future waypoints (trajectory) for autonomous driving using three different approaches:
 
-## Setup + Starter Code
+1. **MLP Planner**: Simple feedforward neural network using ground truth lane boundaries
+2. **Transformer Planner**: Cross-attention based model inspired by Perceiver architecture
+3. **CNN Planner**: Convolutional neural network that predicts waypoints directly from images
 
-In this assignment, we'll be using the [SuperTuxKart Drive Dataset](https://www.cs.utexas.edu/~bzhou/dl_class/drive_data.zip) to train our models. 
+## 📊 Performance Requirements
 
-Download the dataset running the following command:
+| Model | Longitudinal Error | Lateral Error |
+|-------|-------------------|---------------|
+| MLP Planner | < 0.2 | < 0.6 |
+| Transformer Planner | < 0.2 | < 0.6 |
+| CNN Planner | < 0.30 | < 0.45 |
+
+## 🛠️ Setup
+
+### Prerequisites
+- Python 3.10+
+- Apple Silicon Mac (M1/M2/M3/M4) for optimal performance
+- Miniconda or Anaconda
+
+### Installation
+
+1. **Clone the repository**
+```bash
+git clone https://github.com/nitin2468git/autonomous-driving-transformers.git
+cd autonomous-driving-transformers
+```
+
+2. **Create and activate conda environment**
+```bash
+conda create -n hw4 python=3.10 -y
+conda activate hw4
+```
+
+3. **Install PyTorch for Apple Silicon**
+```bash
+pip install torch torchvision torchaudio
+```
+
+4. **Install other dependencies**
+```bash
+pip install -r requirements.txt
+```
+
+5. **Download the dataset**
 ```bash
 curl -s -L https://www.cs.utexas.edu/~bzhou/dl_class/drive_data.zip -o ./drive_data.zip && unzip -qo drive_data.zip
 ```
 
-**NOTE:** Make sure to download a fresh copy of the dataset!
-We've added some additional metadata needed for this homework.
+## 🏃‍♂️ Training
 
-Verify that your project directory has the following structure:
+### MLP Planner
+```bash
+python3 -m homework.train_planner --model mlp_planner --epochs 50 --batch_size 32
 ```
-bundle.py
-grader/
-homework/
-drive_data/
+
+### Transformer Planner
+```bash
+python3 -m homework.train_planner --model transformer_planner --epochs 100 --batch_size 16
 ```
-You will run all scripts from inside this main directory.
 
-In the `homework` directory, you'll find the following:
-- `models.py` - where you will implement various models
-- `metrics.py` - metrics to evaluate your models
-- `datasets/` - contains loading and data transformations
-- `supertux_utils/` - game wrapper + visualization (optional)
+### CNN Planner
+```bash
+python3 -m homework.train_planner --model cnn_planner --epochs 80 --batch_size 16
+```
 
-## Training
+### Training Options
+- `--epochs`: Number of training epochs (default: 50)
+- `--batch_size`: Batch size (default: 32)
+- `--lr`: Learning rate (default: 1e-3)
+- `--weight_decay`: Weight decay (default: 1e-4)
+- `--num_workers`: Data loading workers (default: 2)
+- `--device`: Device to use (default: auto-detects MPS/CPU)
 
-As in the previous homework, you will implement the training code from scratch!
-This might seem cumbersome modifying the same code repeatedly, but this will help understand the engineering behind writing model/data agnostic training pipelines.
+## 🧠 Model Architectures
 
-Recall that a training pipeline includes:
-* Creating an optimizer
-* Creating a model, loss, metrics
-* Loading the data
-* Running the optimizer for several epochs
-* Logging + saving your model (use the provided `save_model`)
+### MLP Planner
+- **Input**: Ground truth lane boundaries (`track_left`, `track_right`)
+- **Architecture**: 4-layer feedforward network with ReLU activations and dropout
+- **Output**: Predicted waypoints `(batch_size, n_waypoints, 2)`
 
-### Grader Instructions
+### Transformer Planner
+- **Input**: Ground truth lane boundaries (`track_left`, `track_right`)
+- **Architecture**: Cross-attention with learned query embeddings (Perceiver-inspired)
+- **Components**: 
+  - Learned waypoint query embeddings
+  - Linear projection of track points
+  - Transformer decoder layer for cross-attention
+- **Output**: Predicted waypoints `(batch_size, n_waypoints, 2)`
 
-You can grade your trained models by running the following command from the main directory:
-- `python3 -m grader homework -v` for medium verbosity
-- `python3 -m grader homework -vv` to include print statements
-- `python3 -m grader homework --disable_color` for Google Colab
+### CNN Planner
+- **Input**: RGB images `(batch_size, 3, 96, 128)`
+- **Architecture**: 4-layer CNN with batch normalization and pooling
+- **Components**:
+  - Convolutional backbone (32→64→128→256 channels)
+  - Max pooling layers
+  - Fully connected layers for waypoint prediction
+- **Output**: Predicted waypoints `(batch_size, n_waypoints, 2)`
 
-## Part 1a: MLP Planner (35 points)
+## 📈 Evaluation
 
-In this part, we will implement a MLP to learn how to drive!
-Rather than learning from images directly, we will predict the desired trajectory of the vehicle from the ground truth lane boundaries (similar to the output of Homework 3 models).
+### Offline Metrics
+- **Longitudinal Error**: Absolute difference in forward direction (speed prediction)
+- **Lateral Error**: Absolute difference in left/right direction (steering prediction)
 
-After we have these the desired future trajectory (waypoints), we can use a simple controller to follow the waypoints and drive the vehicle in PySuperTuxKart.
+### Grading
+```bash
+python3 -m grader homework -v
+```
 
-To train this model, we'll use the following data:
-* `track_left` - `(n_track, 2)` float, left lane boundaries points
-* `track_right` - `(n_track, 2)` float, right lane boundaries points
-* `waypoints` - `(n_waypoints, 2)` float, target waypoints
-* `waypoints_mask` - `(n_waypoints,)` bool mask indicating "clean" waypoints
+## 🎮 SuperTuxKart Integration (Optional)
 
-<img src="assets/sample.png" width="600">
+For visualization of driving performance:
 
-For parts 1a/1b, the model will not use the image as input, and instead take in the ground truth `track_left` and `track_right` as input.
-You can think of these two planners as having have perfect vision systems and knowledge of the world.
-
-Relevant code:
-* `datasets/road_dataset.py:RoadDataset.get_transform`
-* `datasets/road_transforms.py:EgoTrackProcessor`
-
-The data processing functions are already implemented, but feel free to add custom transformations for data augmentation.
-
-### Model
-
-Implement the `MLPPlanner` model in `models.py`.
-
-Your `forward` function receives a `(B, n_track, 2)` tensor of left lane boundaries and a `(B, n_track, 2)` tensor of right lane boundaries and should return a `(B, n_waypoints, 2)` tensor of predicted vehicle positions at the next `n_waypoints` time-steps.
-Find a suitable loss function to train your model, given that the output waypoints are real-valued.
-For all parts in the homework, the number of input boundary points `n_track=10` and the number of output waypoints `n_waypoints=3` are fixed.
-
-For full credit, your model should achieve:
-- < 0.2 Longitudinal error
-- < 0.6 Lateral error
-
-### Evaluation
-
-We will evaluate your planner with two offline metrics.
-Longitudinal error (absolute difference in the forward direction) is a good proxy for how well the model can predict the speed of the vehicle, while lateral error (absolute difference in the left/right direction) is a good proxy for how well the model can predict the steering of the vehicle.
-
-Once your model is able to predict the trajectory well, we can run the model in SuperTuxKart to see how well it drives!
-
-OPTIONAL: To get SuperTuxKart and the visualization scripts running, 
 ```bash
 pip install PySuperTuxKartData
 pip install PySuperTuxKart --index-url=https://www.cs.utexas.edu/~bzhou/dl_class/pystk
 
-# PySuperTuxKart requires several dependencies and has only been tested on certain systems.
-# Check out https://www.cs.utexas.edu/~bzhou/dl_class/pystk/pysupertuxkart/
-# for the full list of pre-built supported python versions / OS / CPU architectures.
-
-# If this doesn't work, you can always run your model on Colab,
-# or you can trying installing from source https://github.com/philkr/pystk
-```
-
-Getting this installed can be tricky and don't worry if you can't get PySuperTuxKart running locally - we'll still be able to evaluate your model when you submit.
-Additionally, the offline metrics are a strong proxy for how well the model will perform when actually driving, so if your numbers are good, it will most likely drive well.
-
-If you want to visualize the driving, see the following files in `supertux_utils` module:
-* `evaluate.py` - logic on how the model's predictions are used to drive and how the game is run
-* `visualizations.py` - matplotlib visualzation of the driving (requires `imageio` to be installed)
-
-Then you can run the following to see how your model drives:
-```bash
+# Run evaluation
 python3 -m homework.supertux_utils.evaluate --model mlp_planner --track lighthouse
 ```
 
-See `homework/supertux_utils/evaluate.py` for additional flags.
+## 📁 Project Structure
 
-### Part 1b: Transformer Planner (35 points)
-
-We'll build a similar model to Part 1a, but this time we'll use a Transformer.
-
-Compared to the MLP model, there are many more ways to design this model!
-One way to do this is by using a set of `n_waypoints` learned query embeddings to attend over the set of points in lane boundaries.
-More specifically, the network will consist of cross attention using the waypoint embeddings as queries, and the lane boundary features as the keys and values.
-
-This architecture most closely resembles the [Perceiver](https://arxiv.org/pdf/2103.03206) model, where in our setting, the "latent array" corresponds to the target waypoint query embeddings (`nn.Embedding`), while the "byte array" refers to the encoded input lane boundaries.
-
-<img src="assets/perceiver_architecture.png" width="600">
-
-Training the transformer will likely require more tuning, so make sure to optimize your training pipeline to allow for faster experimentation.
-
-For full credit, your model should achieve:
-- < 0.2 Longitudinal error
-- < 0.6 Lateral error
-
-### Relevant Operations
-- [torch.nn.Embedding](https://pytorch.org/docs/stable/generated/torch.nn.Embedding.html)
-- [torch.nn.TransformerDecoderLayer](https://pytorch.org/docs/stable/generated/torch.nn.TransformerDecoderLayer.html)
-- [torch.nn.TransformerDecoder](https://pytorch.org/docs/stable/generated/torch.nn.TransformerDecoder.html)
-
-## Part 2: CNN Planner (30 points)
-
-One major limitation of the previous models is that they require the ground truth lane boundaries as input.
-In the previous homework, we trained a model to predict these in image space, but reprojecting the lane boundaries from image space to the vehicle's coordinate frame is non-trivial as small depth errors are magnified through the re-projection process.
-
-Rather than going through segmentation and depth estimation, we can learn to predict the lane boundaries in the vehicle's coordinate frame directly from the image!
-
-Implement the `CNNPlanner` model in `models.py`.
-
-Your `forward` function receives a `(B, 3, 96, 128)` image tensor as input and should return a `(B, n_waypoints, 2)` tensor of predicted vehicle positions at the next `n_waypoints` time-steps.
-
-The previous homeworks image backbones will be useful here, but you will need to modify the output layer to predict the desired waypoints.
-
-Previously, we used CNNs + linear layers to predict tensors with shape
-- `(B, num_classes)` for classification
-- `(B, num_classes, H, W)` for segmentation
-- `(B, 1, H, W)` for depth
-
-But now we need to predict waypoints `(B, n_waypoints, 2)`.
-
-One simple way to do this is simply produce a `(B, n_waypoints * 2)` tensor and reshape it to `(B, n_waypoints, 2)`.
-
-For full credit, your model should achieve:
-- < 0.30 Longitudinal error
-- < 0.45 Lateral error
-
-## Submission
-
-Create a submission bundle (max size **60MB**) using:
-```bash
-python3 bundle.py homework $YOUR_UT_ID
+```
+autonomous-driving-transformers/
+├── homework/
+│   ├── models.py              # Model implementations
+│   ├── train_planner.py       # Training pipeline
+│   ├── metrics.py             # Evaluation metrics
+│   └── datasets/              # Data loading and transforms
+├── grader/                    # Grading system
+├── drive_data/                # SuperTuxKart dataset
+├── assets/                    # Project images
+└── requirements.txt           # Dependencies
 ```
 
-If you notice that your bundle is too large, you can modify the `bundle.py` script and ignore large files by adding them manually to `BLACKLIST`.
+## 🔧 Key Features
 
-Please double-check that your zip file was properly created by grading it again.
+- **Apple Silicon Optimized**: Uses MPS (Metal Performance Shaders) for GPU acceleration
+- **Modular Design**: Easy to extend with new model architectures
+- **Comprehensive Training**: Includes validation, learning rate scheduling, and model saving
+- **Performance Tracking**: Real-time metrics during training
+- **Git Integration**: Ready for version control and collaboration
+
+## 📝 Usage Examples
+
+### Quick Test
 ```bash
-python3 -m grader $YOUR_UT_ID.zip
+# Test MLP model with 2 epochs
+python3 -m homework.train_planner --model mlp_planner --epochs 2 --batch_size 8 --num_workers 0
 ```
-After verifying that the zip file grades successfully, you can submit it on Canvas.
+
+### Full Training
+```bash
+# Train Transformer model with custom parameters
+python3 -m homework.train_planner \
+    --model transformer_planner \
+    --epochs 100 \
+    --batch_size 16 \
+    --lr 5e-4 \
+    --weight_decay 1e-5
+```
+
+## 🤝 Contributing
+
+This is a university assignment, but feel free to:
+- Report issues
+- Suggest improvements
+- Fork for your own projects
+
+## 📄 License
+
+This project is part of the UT Austin Deep Learning course curriculum.
+
+## 🙏 Acknowledgments
+
+- UT Austin Deep Learning Course
+- SuperTuxKart for the driving simulation
+- PyTorch team for the excellent framework
+
+---
+
+**Note**: This project is designed for educational purposes and demonstrates various approaches to autonomous driving trajectory prediction using modern deep learning techniques.
