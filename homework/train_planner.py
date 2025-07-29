@@ -15,9 +15,9 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from datasets.road_dataset import load_data
-from metrics import PlannerMetric
-from models import MODEL_FACTORY, save_model
+from homework.datasets.road_dataset import load_data
+from homework.metrics import PlannerMetric
+from homework.models import MODEL_FACTORY, save_model
 
 
 def train_epoch(
